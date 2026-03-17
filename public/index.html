@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CG Entitlements Check</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --border: #2d3a4f;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --warn: #d29922;
+      --error: #f85149;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 1.5rem;
+      line-height: 1.5;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 1rem; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.875rem;
+      font-family: inherit;
+    }
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    input::placeholder, textarea::placeholder { color: var(--text-muted); }
+    .form-row { margin-bottom: 1rem; }
+    .form-row:last-of-type { margin-bottom: 1.25rem; }
+    button {
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .summary {
+      font-size: 0.875rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1rem;
+    }
+    .summary.ok { color: var(--success); }
+    .summary.err { color: var(--error); }
+    .account-block {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 0.75rem;
+      overflow: hidden;
+    }
+    .account-head {
+      padding: 0.6rem 0.75rem;
+      background: var(--surface);
+      font-weight: 600;
+      font-size: 0.875rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .account-head:hover { background: #243447; }
+    .account-head .badge {
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: var(--warn);
+      color: var(--bg);
+    }
+    .account-body {
+      display: none;
+      padding: 0.75rem 1rem;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      font-size: 0.8125rem;
+    }
+    .account-body.open { display: block; }
+    .account-body ul { margin: 0; padding-left: 1.25rem; }
+    .account-body li { margin-bottom: 0.35rem; }
+    .diff-path { color: var(--text-muted); }
+    .only-a { color: var(--accent); }
+    .only-b { color: var(--warn); }
+    .value-diff { margin-top: 0.5rem; }
+    .value-diff .path { color: var(--text-muted); font-size: 0.75rem; }
+    .loading { color: var(--text-muted); }
+    .error-box {
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid var(--error);
+      color: var(--error);
+      padding: 0.75rem;
+      border-radius: 6px;
+      margin-top: 1rem;
+      font-size: 0.875rem;
+    }
+    .hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>CG Entitlements Check</h1>
+    <div class="card">
+      <form id="form">
+        <div class="form-row">
+          <label for="xAppKey">x-app-key</label>
+          <input type="text" id="xAppKey" name="xAppKey" placeholder="Your app key" required>
+        </div>
+        <p class="hint">Cookies are sent automatically from your browser when you’re logged into *.test-godaddy.com.</p>
+        <button type="submit" id="submitBtn">Run compare</button>
+      </form>
+    </div>
+    <div id="out"></div>
+  </div>
+  <script>
+    const form = document.getElementById('form');
+    const submitBtn = document.getElementById('submitBtn');
+    const out = document.getElementById('out');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const xAppKey = document.getElementById('xAppKey').value.trim();
+      if (!xAppKey) return;
+      submitBtn.disabled = true;
+      out.innerHTML = '<div class="card loading">Running compare…</div>';
+      try {
+        const res = await fetch('/api/compare', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ xAppKey }),
+        });
+        const data = await res.json();
+        render(data);
+      } catch (err) {
+        out.innerHTML = `<div class="card error-box">Request failed: ${err.message}</div>`;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    function render(data) {
+      if (!data.success) {
+        out.innerHTML = `
+          <div class="card">
+            <div class="summary err">${escapeHtml(data.error)}</div>
+            ${data.errorDetail ? `<pre class="error-box" style="white-space:pre-wrap;font-size:0.8rem">${escapeHtml(data.errorDetail)}</pre>` : ''}
+          </div>`;
+        return;
+      }
+      const total = data.totalAccounts ?? data.accountIds?.length ?? 0;
+      const withDiff = data.withDifferences ?? [];
+      let html = '<div class="card">';
+      html += `<div class="summary ${withDiff.length === 0 ? 'ok' : ''}">`;
+      html += `Scanned ${total} account(s). `;
+      if (withDiff.length === 0) {
+        html += 'No differences found — all accounts match.';
+      } else {
+        html += `<strong>${withDiff.length} account(s) with differences:</strong>`;
+      }
+      html += '</div>';
+      if (withDiff.length > 0) {
+        withDiff.forEach((item, i) => {
+          const openClass = i === 0 ? ' open' : '';
+          html += '<div class="account-block">';
+          html += `<div class="account-head" onclick="this.nextElementSibling.classList.toggle('open')">`;
+          html += `<span>Account ${escapeHtml(String(item.accountId))}</span>`;
+          html += '<span class="badge">diff</span></div>';
+          html += `<div class="account-body${openClass}">`;
+          if (item.error) {
+            if (item.accountsError) {
+              html += `<p><span class="only-a">Accounts API:</span> ${item.accountsError.status} ${escapeHtml(String(item.accountsError.body || '').slice(0, 200))}</p>`;
+            }
+            if (item.capabilitiesError) {
+              html += `<p><span class="only-b">Capabilities-graph API:</span> ${item.capabilitiesError.status} ${escapeHtml(String(item.capabilitiesError.body || '').slice(0, 200))}</p>`;
+            }
+          } else if (item.diff) {
+            if (item.diff.onlyInA?.length) {
+              html += '<p class="only-a">Only in accounts API (paths):</p><ul>';
+              item.diff.onlyInA.forEach((p) => { html += `<li class="diff-path">${escapeHtml(p)}</li>`; });
+              html += '</ul>';
+            }
+            if (item.diff.onlyInB?.length) {
+              html += '<p class="only-b">Only in capabilities-graph (paths):</p><ul>';
+              item.diff.onlyInB.forEach((p) => { html += `<li class="diff-path">${escapeHtml(p)}</li>`; });
+              html += '</ul>';
+            }
+            if (item.diff.valueDiffs?.length) {
+              html += '<p>Value differences:</p>';
+              item.diff.valueDiffs.forEach((vd) => {
+                html += `<div class="value-diff"><span class="path">${escapeHtml(vd.path)}</span><br>`;
+                html += `<code>${escapeHtml(JSON.stringify(vd.a))}</code> vs <code>${escapeHtml(JSON.stringify(vd.b))}</code></div>`;
+              });
+            }
+          }
+          html += '</div></div>';
+        });
+      }
+      html += '</div>';
+      out.innerHTML = html;
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>

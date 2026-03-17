@@ -1,0 +1,12 @@
+{
+  "name": "cg-entitlements-check",
+  "version": "1.0.0",
+  "description": "Browser UI to compare entitlements from accounts API vs capabilities-graph API",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}
