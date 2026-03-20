@@ -15,6 +15,7 @@
       --success: #3fb950;
       --warn: #d29922;
       --error: #f85149;
+      --purple: #bc8cff;
     }
     * { box-sizing: border-box; }
     body {
@@ -25,7 +26,7 @@
       padding: 1.5rem;
       line-height: 1.5;
     }
-    .container { max-width: 900px; margin: 0 auto; }
+    .container { max-width: 1100px; margin: 0 auto; }
     h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 1rem; }
     .card {
       background: var(--surface);
@@ -50,11 +51,10 @@
       color: var(--text);
       font-size: 0.875rem;
       font-family: inherit;
+      outline: none;
     }
-    textarea {
-      min-height: 80px;
-      resize: vertical;
-    }
+    input[type="text"]:focus { border-color: var(--accent); }
+    textarea { min-height: 80px; resize: vertical; }
     input::placeholder, textarea::placeholder { color: var(--text-muted); }
     .form-row { margin-bottom: 1rem; }
     .form-row:last-of-type { margin-bottom: 1.25rem; }
@@ -70,14 +70,35 @@
     }
     button:hover { opacity: 0.9; }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .summary {
+
+    /* ── Summary bar ── */
+    .summary-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
       font-size: 0.875rem;
       padding: 0.75rem 0;
       border-bottom: 1px solid var(--border);
       margin-bottom: 1rem;
     }
-    .summary.ok { color: var(--success); }
-    .summary.err { color: var(--error); }
+    .summary-bar.ok { color: var(--success); }
+    .summary-bar.err { color: var(--error); }
+    .summary-text { flex: 1; }
+    .icon-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 0.25rem 0.6rem;
+      font-size: 0.75rem;
+      border-radius: 4px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .icon-btn:hover { background: var(--surface); color: var(--text); border-color: var(--text-muted); }
+    .icon-btn.active { background: rgba(88,166,255,0.1); border-color: var(--accent); color: var(--accent); }
+
+    /* ── Account blocks ── */
     .account-block {
       border: 1px solid var(--border);
       border-radius: 6px;
@@ -87,22 +108,33 @@
     .account-head {
       padding: 0.6rem 0.75rem;
       background: var(--surface);
-      font-weight: 600;
-      font-size: 0.875rem;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 0.5rem;
+      user-select: none;
     }
     .account-head:hover { background: #243447; }
-    .account-head .badge {
-      font-size: 0.75rem;
-      font-weight: 500;
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      background: var(--warn);
-      color: var(--bg);
+    .account-head-left { display: flex; align-items: center; gap: 0.45rem; flex: 1; min-width: 0; }
+    .account-head-right { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
+    .account-chevron {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      transition: transform 0.15s;
+      transform: rotate(-90deg);
     }
+    .account-head.open .account-chevron { transform: rotate(0deg); }
+    .account-title { font-size: 0.875rem; font-weight: 600; }
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+    }
+    .badge-diff { background: var(--warn); color: var(--bg); }
+    .badge-a { background: rgba(88,166,255,0.15); color: var(--accent); border: 1px solid rgba(88,166,255,0.3); }
+    .badge-b { background: rgba(210,153,34,0.15); color: var(--warn); border: 1px solid rgba(210,153,34,0.3); }
     .account-body {
       display: none;
       padding: 0.75rem 1rem;
@@ -111,13 +143,180 @@
       font-size: 0.8125rem;
     }
     .account-body.open { display: block; }
-    .account-body ul { margin: 0; padding-left: 1.25rem; }
-    .account-body li { margin-bottom: 0.35rem; }
-    .diff-path { color: var(--text-muted); }
-    .only-a { color: var(--accent); }
-    .only-b { color: var(--warn); }
-    .value-diff { margin-top: 0.5rem; }
-    .value-diff .path { color: var(--text-muted); font-size: 0.75rem; }
+
+    /* ── Panels toolbar (sync toggle) ── */
+    .panels-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      margin-bottom: 0.5rem;
+    }
+    .sync-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 0.2rem 0.55rem;
+      font-size: 0.72rem;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      cursor: pointer;
+    }
+    .sync-btn:hover { border-color: var(--text-muted); color: var(--text); }
+    .sync-btn.active { background: rgba(88,166,255,0.1); border-color: var(--accent); color: var(--accent); }
+
+    /* ── Side-by-side diff panels ── */
+    .diff-panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    .diff-panel {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .diff-panel-header {
+      padding: 0.45rem 0.75rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .diff-panel-title { font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+    .diff-panel-title.panel-a { color: var(--accent); }
+    .diff-panel-title.panel-b { color: var(--warn); }
+    .diff-panel-header-right { display: flex; align-items: center; gap: 0.4rem; }
+    .diff-panel-count { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+    .copy-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 0.15rem 0.4rem;
+      font-size: 0.7rem;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      white-space: nowrap;
+    }
+    .copy-btn:hover { border-color: var(--text-muted); color: var(--text); }
+    .copy-btn.copied { border-color: var(--success); color: var(--success); background: rgba(63,185,80,0.08); }
+
+    /* ── Filter input ── */
+    .diff-panel-search {
+      padding: 0.35rem 0.6rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .diff-panel-search input { font-size: 0.8rem; padding: 0.3rem 0.5rem; }
+
+    /* ── Namespace chips ── */
+    .ns-chips-wrapper {
+      border-bottom: 1px solid var(--border);
+    }
+    .ns-chips-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.22rem 0.6rem;
+      cursor: pointer;
+      background: #141e2b;
+      user-select: none;
+    }
+    .ns-chips-header:hover { background: #172030; }
+    .ns-chips-label {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .ns-chips-chevron {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      transition: transform 0.15s;
+    }
+    .ns-chips-wrapper.collapsed .ns-chips-chevron { transform: rotate(-90deg); }
+    .ns-chips-wrapper.collapsed .ns-chip:not(.active) { display: none; }
+    .ns-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      padding: 0.3rem 0.6rem;
+      background: #141e2b;
+    }
+    .ns-chips-wrapper.collapsed .ns-chips:not(:has(.ns-chip.active)) { display: none; }
+    .ns-chip {
+      font-size: 0.68rem;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .ns-chip:hover { border-color: var(--purple); color: var(--purple); }
+    .ns-chip.active { border-color: var(--purple); color: var(--purple); background: rgba(188,140,255,0.1); }
+    .ns-chip-count { opacity: 0.65; margin-left: 0.2rem; }
+
+    /* ── Entry list ── */
+    .diff-panel-list {
+      overflow-y: auto;
+      max-height: 300px;
+      padding: 0.25rem 0;
+    }
+    .diff-panel-item {
+      padding: 0.3rem 0.75rem;
+      font-size: 0.8rem;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      border-bottom: 1px solid rgba(45,58,79,0.5);
+      word-break: break-all;
+      cursor: default;
+    }
+    .diff-panel-item:last-child { border-bottom: none; }
+    .diff-panel-item:hover { background: rgba(88,166,255,0.05); }
+    .diff-panel-item.hidden { display: none; }
+    .path-prefix { color: var(--text-muted); }
+    .path-suffix { color: var(--purple); }
+    .diff-panel-empty {
+      padding: 0.75rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      text-align: center;
+    }
+
+    /* ── Value diffs ── */
+    .value-diffs-section { margin-top: 0.75rem; }
+    .value-diffs-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.4rem;
+    }
+    .value-diff-item {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.4rem 0.6rem;
+      margin-bottom: 0.4rem;
+      font-size: 0.775rem;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    }
+    .value-diff-path { color: var(--text-muted); margin-bottom: 0.25rem; }
+    .value-diff-row { display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap; }
+    .value-diff-a { color: var(--accent); }
+    .value-diff-b { color: var(--warn); }
+    .value-diff-sep { color: var(--text-muted); }
+
     .loading { color: var(--text-muted); }
     .error-box {
       background: rgba(248, 81, 73, 0.1);
@@ -129,6 +328,10 @@
       font-size: 0.875rem;
     }
     .hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+    @media (max-width: 640px) {
+      .diff-panels { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -140,7 +343,7 @@
           <label for="xAppKey">x-app-key</label>
           <input type="text" id="xAppKey" name="xAppKey" placeholder="Your app key" required>
         </div>
-        <p class="hint">Cookies are sent automatically from your browser when you’re logged into *.test-godaddy.com.</p>
+        <p class="hint">Cookies are sent automatically from your browser when you're logged into *.test-godaddy.com.</p>
         <button type="submit" id="submitBtn">Run compare</button>
       </form>
     </div>
@@ -150,6 +353,9 @@
     const form = document.getElementById('form');
     const submitBtn = document.getElementById('submitBtn');
     const out = document.getElementById('out');
+
+    // Sync state keyed by panelId
+    const syncState = {};
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -177,62 +383,316 @@
       if (!data.success) {
         out.innerHTML = `
           <div class="card">
-            <div class="summary err">${escapeHtml(data.error)}</div>
+            <div class="summary-bar err"><span class="summary-text">${escapeHtml(data.error)}</span></div>
             ${data.errorDetail ? `<pre class="error-box" style="white-space:pre-wrap;font-size:0.8rem">${escapeHtml(data.errorDetail)}</pre>` : ''}
           </div>`;
         return;
       }
+
       const total = data.totalAccounts ?? data.accountIds?.length ?? 0;
       const withDiff = data.withDifferences ?? [];
+
       let html = '<div class="card">';
-      html += `<div class="summary ${withDiff.length === 0 ? 'ok' : ''}">`;
+      html += `<div class="summary-bar ${withDiff.length === 0 ? 'ok' : ''}">`;
+      html += '<span class="summary-text">';
       html += `Scanned ${total} account(s). `;
       if (withDiff.length === 0) {
         html += 'No differences found — all accounts match.';
       } else {
-        html += `<strong>${withDiff.length} account(s) with differences:</strong>`;
+        html += `<strong>${withDiff.length} account(s) with differences</strong>`;
+      }
+      html += '</span>';
+      if (withDiff.length > 1) {
+        html += `<button class="icon-btn" onclick="toggleAllAccounts(this)">Expand all</button>`;
       }
       html += '</div>';
-      if (withDiff.length > 0) {
-        withDiff.forEach((item, i) => {
-          const openClass = i === 0 ? ' open' : '';
-          html += '<div class="account-block">';
-          html += `<div class="account-head" onclick="this.nextElementSibling.classList.toggle('open')">`;
-          html += `<span>Account ${escapeHtml(String(item.accountId))}</span>`;
-          html += '<span class="badge">diff</span></div>';
-          html += `<div class="account-body${openClass}">`;
-          if (item.error) {
-            if (item.accountsError) {
-              html += `<p><span class="only-a">Accounts API:</span> ${item.accountsError.status} ${escapeHtml(String(item.accountsError.body || '').slice(0, 200))}</p>`;
-            }
-            if (item.capabilitiesError) {
-              html += `<p><span class="only-b">Capabilities-graph API:</span> ${item.capabilitiesError.status} ${escapeHtml(String(item.capabilitiesError.body || '').slice(0, 200))}</p>`;
-            }
-          } else if (item.diff) {
-            if (item.diff.onlyInA?.length) {
-              html += '<p class="only-a">Only in accounts API (paths):</p><ul>';
-              item.diff.onlyInA.forEach((p) => { html += `<li class="diff-path">${escapeHtml(p)}</li>`; });
-              html += '</ul>';
-            }
-            if (item.diff.onlyInB?.length) {
-              html += '<p class="only-b">Only in capabilities-graph (paths):</p><ul>';
-              item.diff.onlyInB.forEach((p) => { html += `<li class="diff-path">${escapeHtml(p)}</li>`; });
-              html += '</ul>';
-            }
-            if (item.diff.valueDiffs?.length) {
-              html += '<p>Value differences:</p>';
-              item.diff.valueDiffs.forEach((vd) => {
-                html += `<div class="value-diff"><span class="path">${escapeHtml(vd.path)}</span><br>`;
-                html += `<code>${escapeHtml(JSON.stringify(vd.a))}</code> vs <code>${escapeHtml(JSON.stringify(vd.b))}</code></div>`;
-              });
-            }
+
+      withDiff.forEach((item, i) => {
+        const isFirst = i === 0;
+        const openClass = isFirst ? ' open' : '';
+        const onlyA = item.diff?.onlyInA ?? [];
+        const onlyB = item.diff?.onlyInB ?? [];
+
+        html += '<div class="account-block">';
+
+        // Account header with count badges
+        html += `<div class="account-head${openClass}" onclick="toggleAccount(this)">`;
+        html += `<div class="account-head-left">`;
+        html += `<span class="account-chevron">▼</span>`;
+        html += `<span class="account-title">Account ${escapeHtml(String(item.accountId))}</span>`;
+        html += '</div>';
+        html += `<div class="account-head-right">`;
+        if (!item.error) {
+          html += `<span class="badge badge-a" title="Accounts API only">A: ${onlyA.length}</span>`;
+          html += `<span class="badge badge-b" title="Capabilities-graph only">B: ${onlyB.length}</span>`;
+        }
+        html += `<span class="badge badge-diff">diff</span>`;
+        html += '</div></div>';
+
+        // Account body
+        html += `<div class="account-body${openClass}">`;
+
+        if (item.error) {
+          if (item.accountsError) {
+            html += `<p style="color:var(--accent)">Accounts API: ${item.accountsError.status} ${escapeHtml(String(item.accountsError.body || '').slice(0, 200))}</p>`;
           }
-          html += '</div></div>';
-        });
-      }
+          if (item.capabilitiesError) {
+            html += `<p style="color:var(--warn)">Capabilities-graph API: ${item.capabilitiesError.status} ${escapeHtml(String(item.capabilitiesError.body || '').slice(0, 200))}</p>`;
+          }
+        } else if (item.diff) {
+          const panelId = `panel-${i}`;
+
+          // Sync toggle toolbar
+          html += `<div class="panels-toolbar">`;
+          html += `<button class="sync-btn" id="${panelId}-sync" onclick="toggleSync('${panelId}')" title="Link both filter inputs so typing in one filters both">`;
+          html += `⇄ Link filters</button>`;
+          html += '</div>';
+
+          // Side-by-side panels
+          html += '<div class="diff-panels">';
+          html += buildPanel(panelId, 'a', 'Accounts API only', 'panel-a', onlyA);
+          html += buildPanel(panelId, 'b', 'Capabilities-graph only', 'panel-b', onlyB);
+          html += '</div>';
+
+          // Value diffs below panels
+          if (item.diff.valueDiffs?.length) {
+            html += '<div class="value-diffs-section">';
+            html += '<div class="value-diffs-label">Value differences</div>';
+            item.diff.valueDiffs.forEach((vd) => {
+              html += `<div class="value-diff-item">`;
+              html += `<div class="value-diff-path">${escapeHtml(vd.path)}</div>`;
+              html += `<div class="value-diff-row">`;
+              html += `<span class="value-diff-a">${escapeHtml(JSON.stringify(vd.a))}</span>`;
+              html += `<span class="value-diff-sep">→</span>`;
+              html += `<span class="value-diff-b">${escapeHtml(JSON.stringify(vd.b))}</span>`;
+              html += '</div></div>';
+            });
+            html += '</div>';
+          }
+        }
+
+        html += '</div></div>';
+      });
+
       html += '</div>';
       out.innerHTML = html;
+
+      // Attach Escape-to-clear on every filter input
+      out.querySelectorAll('.diff-panel-search input').forEach((input) => {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            input.value = '';
+            input.dispatchEvent(new Event('input'));
+            input.blur();
+          }
+        });
+      });
     }
+
+    // ── Panel builder ────────────────────────────────────────────────────────
+
+    function buildPanel(panelId, side, title, titleClass, paths) {
+      const id = `${panelId}-${side}`;
+      const nsGroups = buildNsGroups(paths);
+
+      let html = '<div class="diff-panel">';
+
+      // Header: title + count + copy button
+      html += '<div class="diff-panel-header">';
+      html += `<span class="diff-panel-title ${titleClass}">${title}</span>`;
+      html += '<div class="diff-panel-header-right">';
+      html += `<span class="diff-panel-count" id="${id}-count">${paths.length} entries</span>`;
+      html += `<button class="copy-btn" id="${id}-copy" onclick="copyPanel('${id}')" title="Copy visible entries to clipboard">`;
+      html += `<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor" style="flex-shrink:0">`;
+      html += `<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/>`;
+      html += `<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>`;
+      html += `Copy</button>`;
+      html += '</div></div>';
+
+      // Filter input
+      html += '<div class="diff-panel-search">';
+      html += `<input type="text" placeholder="Filter… (Esc to clear)" data-panel="${id}" data-panelid="${panelId}" data-side="${side}" oninput="onFilterInput(this)">`;
+      html += '</div>';
+
+      // Namespace chips (only shown when there are multiple namespaces)
+      if (nsGroups.length > 1) {
+        html += `<div class="ns-chips-wrapper" id="${id}-chips-wrapper">`;
+        html += `<div class="ns-chips-header" onclick="toggleChipsSection('${id}')">`;
+        html += `<span class="ns-chips-label">Namespaces</span>`;
+        html += `<span class="ns-chips-chevron">▼</span>`;
+        html += '</div>';
+        html += `<div class="ns-chips" id="${id}-chips">`;
+        nsGroups.forEach((g) => {
+          html += `<span class="ns-chip" data-ns="${escapeHtml(g.ns)}" data-panel="${id}" onclick="clickChip(this)">`;
+          html += `${escapeHtml(g.ns)}<span class="ns-chip-count">${g.count}</span>`;
+          html += '</span>';
+        });
+        html += '</div>';
+        html += '</div>';
+      }
+
+      // Entry list
+      html += `<div class="diff-panel-list" id="${id}">`;
+      if (paths.length === 0) {
+        html += '<div class="diff-panel-empty">No entries</div>';
+      } else {
+        paths.forEach((p) => { html += pathItem(p); });
+      }
+      html += '</div>';
+
+      html += '</div>'; // .diff-panel
+      return html;
+    }
+
+    function buildNsGroups(paths) {
+      const map = new Map();
+      paths.forEach((p) => {
+        const parts = p.split('.');
+        const ns = parts.length >= 2 ? parts.slice(0, 2).join('.') : parts[0];
+        map.set(ns, (map.get(ns) || 0) + 1);
+      });
+      return Array.from(map.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([ns, count]) => ({ ns, count }));
+    }
+
+    function pathItem(p) {
+      const lastDot = p.lastIndexOf('.');
+      const prefix = lastDot >= 0 ? escapeHtml(p.slice(0, lastDot + 1)) : '';
+      const suffix = escapeHtml(lastDot >= 0 ? p.slice(lastDot + 1) : p);
+      return `<div class="diff-panel-item" data-path="${escapeHtml(p)}"><span class="path-prefix">${prefix}</span><span class="path-suffix">${suffix}</span></div>`;
+    }
+
+    // ── Filter logic ─────────────────────────────────────────────────────────
+
+    function onFilterInput(input) {
+      const panelId = input.dataset.panelid;
+      const side = input.dataset.side;
+      const query = input.value;
+
+      applyFilter(input.dataset.panel, query);
+
+      // Propagate to peer panel if sync is on
+      if (syncState[panelId]) {
+        const peerSide = side === 'a' ? 'b' : 'a';
+        const peerId = `${panelId}-${peerSide}`;
+        const peerInput = document.querySelector(`input[data-panel="${peerId}"]`);
+        if (peerInput && peerInput.value !== query) {
+          peerInput.value = query;
+          applyFilter(peerId, query);
+        }
+      }
+    }
+
+    function applyFilter(panelId, query) {
+      const list = document.getElementById(panelId);
+      if (!list) return;
+      const q = query.toLowerCase();
+
+      // Clear any active chip when typing
+      const chipsEl = document.getElementById(`${panelId}-chips`);
+      if (chipsEl) chipsEl.querySelectorAll('.ns-chip').forEach((c) => c.classList.remove('active'));
+
+      let visible = 0;
+      list.querySelectorAll('.diff-panel-item').forEach((el) => {
+        const match = !q || el.textContent.toLowerCase().includes(q);
+        el.classList.toggle('hidden', !match);
+        if (match) visible++;
+      });
+      updateCount(panelId, visible, list.querySelectorAll('.diff-panel-item').length, !!q);
+    }
+
+    function clickChip(chip) {
+      const panelId = chip.dataset.panel;
+      const ns = chip.dataset.ns;
+      const chipsEl = document.getElementById(`${panelId}-chips`);
+      const isActive = chip.classList.contains('active');
+
+      // Clear all chips
+      chipsEl.querySelectorAll('.ns-chip').forEach((c) => c.classList.remove('active'));
+
+      // Also clear the filter input
+      const filterInput = document.querySelector(`input[data-panel="${panelId}"]`);
+      if (filterInput) filterInput.value = '';
+
+      const list = document.getElementById(panelId);
+      if (isActive) {
+        // Deactivate: show all
+        list.querySelectorAll('.diff-panel-item').forEach((el) => el.classList.remove('hidden'));
+        const total = list.querySelectorAll('.diff-panel-item').length;
+        updateCount(panelId, total, total, false);
+      } else {
+        chip.classList.add('active');
+        let visible = 0;
+        list.querySelectorAll('.diff-panel-item').forEach((el) => {
+          const path = el.dataset.path || '';
+          const parts = path.split('.');
+          const itemNs = parts.length >= 2 ? parts.slice(0, 2).join('.') : parts[0];
+          const match = itemNs === ns;
+          el.classList.toggle('hidden', !match);
+          if (match) visible++;
+        });
+        updateCount(panelId, visible, list.querySelectorAll('.diff-panel-item').length, true);
+      }
+    }
+
+    function updateCount(panelId, visible, total, filtered) {
+      const countEl = document.getElementById(`${panelId}-count`);
+      if (countEl) countEl.textContent = filtered ? `${visible} / ${total} entries` : `${total} entries`;
+    }
+
+    // ── Copy to clipboard ────────────────────────────────────────────────────
+
+    function copyPanel(panelId) {
+      const list = document.getElementById(panelId);
+      if (!list) return;
+      const lines = [];
+      list.querySelectorAll('.diff-panel-item:not(.hidden)').forEach((el) => {
+        lines.push(el.dataset.path || el.textContent.trim());
+      });
+      navigator.clipboard.writeText(lines.join('\n')).then(() => {
+        const btn = document.getElementById(`${panelId}-copy`);
+        if (!btn) return;
+        const origHTML = btn.innerHTML;
+        btn.textContent = '✓ Copied';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.innerHTML = origHTML; btn.classList.remove('copied'); }, 2000);
+      });
+    }
+
+    // ── Account expand / collapse ────────────────────────────────────────────
+
+    function toggleAccount(head) {
+      const isOpen = head.classList.toggle('open');
+      head.nextElementSibling.classList.toggle('open', isOpen);
+    }
+
+    function toggleAllAccounts(btn) {
+      const heads = [...out.querySelectorAll('.account-head')];
+      const anyCollapsed = heads.some((h) => !h.classList.contains('open'));
+      heads.forEach((head) => {
+        head.classList.toggle('open', anyCollapsed);
+        head.nextElementSibling.classList.toggle('open', anyCollapsed);
+      });
+      btn.textContent = anyCollapsed ? 'Collapse all' : 'Expand all';
+    }
+
+    // ── Namespace chips toggle ───────────────────────────────────────────────
+
+    function toggleChipsSection(id) {
+      const wrapper = document.getElementById(`${id}-chips-wrapper`);
+      if (wrapper) wrapper.classList.toggle('collapsed');
+    }
+
+    // ── Sync toggle ──────────────────────────────────────────────────────────
+
+    function toggleSync(panelId) {
+      syncState[panelId] = !syncState[panelId];
+      const btn = document.getElementById(`${panelId}-sync`);
+      if (btn) btn.classList.toggle('active', !!syncState[panelId]);
+    }
+
+    // ── Utility ──────────────────────────────────────────────────────────────
 
     function escapeHtml(s) {
       const div = document.createElement('div');
