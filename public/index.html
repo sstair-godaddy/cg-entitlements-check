@@ -145,6 +145,14 @@
     .account-body.open { display: block; }
 
     /* ── Panels toolbar (sync toggle) ── */
+    .raw-copy-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .raw-copy-toolbar .copy-btn { font-size: 0.72rem; }
+
     .panels-toolbar {
       display: flex;
       align-items: center;
@@ -317,6 +325,51 @@
     .value-diff-b { color: var(--warn); }
     .value-diff-sep { color: var(--text-muted); }
 
+    /* ── Matching accounts section ── */
+    .matching-block {
+      border: 1px solid rgba(63,185,80,0.25);
+      border-radius: 6px;
+      margin-bottom: 0.75rem;
+      overflow: hidden;
+    }
+    .matching-head {
+      padding: 0.55rem 0.75rem;
+      background: rgba(63,185,80,0.06);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      user-select: none;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--success);
+    }
+    .matching-head:hover { background: rgba(63,185,80,0.1); }
+    .matching-head .account-chevron { color: var(--success); }
+    .matching-body {
+      display: none;
+      padding: 0.5rem 0.75rem;
+      background: var(--bg);
+      border-top: 1px solid rgba(63,185,80,0.2);
+    }
+    .matching-body.open { display: block; }
+    .matching-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      padding: 0.25rem 0;
+    }
+    .matching-id {
+      font-size: 0.775rem;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid rgba(63,185,80,0.3);
+      color: var(--success);
+      background: rgba(63,185,80,0.07);
+    }
+
     .loading { color: var(--text-muted); }
     .error-box {
       background: rgba(248, 81, 73, 0.1);
@@ -329,8 +382,72 @@
     }
     .hint { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
 
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin: 0 0 0.65rem;
+    }
+    .example-compare-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1rem;
+      margin-bottom: 0.35rem;
+    }
+    .example-watch-label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .example-watch-label input { accent-color: var(--accent); cursor: pointer; }
+    #exampleWatchStatus { min-height: 1.1em; }
+
+    .example-compare-out { margin-top: 1rem; }
+    .example-compare-out:empty { margin-top: 0; }
+    .example-compare-block { padding-top: 0.25rem; }
+    .example-json-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 0.35rem;
+    }
+    .example-json-panel {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .example-json-head {
+      padding: 0.4rem 0.65rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .example-json-pre {
+      margin: 0;
+      padding: 0.55rem 0.65rem;
+      background: var(--bg);
+      font-size: 0.68rem;
+      line-height: 1.35;
+      max-height: 320px;
+      overflow: auto;
+      white-space: pre;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    }
+
     @media (max-width: 640px) {
       .diff-panels { grid-template-columns: 1fr; }
+      .example-json-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -343,24 +460,244 @@
           <label for="xAppKey">x-app-key</label>
           <input type="text" id="xAppKey" name="xAppKey" placeholder="Your app key" required>
         </div>
+        <div class="form-row">
+          <label for="accountId">Account ID <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>
+          <input type="text" id="accountId" name="accountId" placeholder="Leave empty to scan all accounts from the accounts API" autocomplete="off">
+        </div>
+        <p class="hint">When set, only this account is compared. Leave empty to fetch the account list and scan every account.</p>
         <p class="hint">Cookies are sent automatically from your browser when you're logged into *.test-godaddy.com.</p>
         <button type="submit" id="submitBtn">Run compare</button>
       </form>
     </div>
+
+    <div class="card">
+      <h2 class="section-title">Example: compare saved responses</h2>
+      <p class="hint" style="margin-top:0">Uses <code>ACCT.json</code> (Accounts API) and <code>CG.json</code> (Capabilities-graph) from the repo as one account's sample payloads. Responses are deep-sorted alphabetically for the side-by-side JSON view; the structural diff uses the same normalization as a live compare.</p>
+      <div class="example-compare-controls">
+        <button type="button" id="loadExampleCompare">Load example comparison</button>
+        <label class="example-watch-label" title="Re-fetch from the server every 2s so edits to the JSON files on disk show up after save">
+          <input type="checkbox" id="exampleWatchFiles" checked>
+          Track JSON files (every 2s)
+        </label>
+      </div>
+      <p id="exampleWatchStatus" class="hint" style="margin-top:0"></p>
+      <div id="exampleCompareOut"></div>
+    </div>
+
     <div id="out"></div>
   </div>
   <script>
     const form = document.getElementById('form');
     const submitBtn = document.getElementById('submitBtn');
     const out = document.getElementById('out');
+    const loadExampleCompareBtn = document.getElementById('loadExampleCompare');
+    const exampleCompareOut = document.getElementById('exampleCompareOut');
+    const exampleWatchFiles = document.getElementById('exampleWatchFiles');
+    const exampleWatchStatus = document.getElementById('exampleWatchStatus');
+
+    const EXAMPLE_POLL_MS = 2000;
+    let examplePollTimer = null;
+    let exampleLastSig = '';
+    let exampleHasRenderedOnce = false;
+
+    // Clipboard text for example sorted JSON panes
+    let exampleJsonStore = { acct: '', cg: '' };
 
     // Sync state keyed by panelId
     const syncState = {};
+
+    function stopExamplePoll() {
+      if (examplePollTimer) {
+        clearInterval(examplePollTimer);
+        examplePollTimer = null;
+      }
+    }
+
+    function startExamplePoll() {
+      stopExamplePoll();
+      if (!exampleWatchFiles.checked || !exampleHasRenderedOnce) return;
+      examplePollTimer = setInterval(() => refreshExampleComparePoll(), EXAMPLE_POLL_MS);
+    }
+
+    function updateExampleWatchStatus({ ok, error, changed }) {
+      if (!exampleWatchFiles.checked || !exampleHasRenderedOnce) {
+        exampleWatchStatus.textContent = '';
+        exampleWatchStatus.style.color = '';
+        return;
+      }
+      const time = new Date().toLocaleTimeString();
+      if (ok) {
+        exampleWatchStatus.textContent = changed
+          ? `Last checked ${time} · content updated`
+          : `Last checked ${time} · no change`;
+        exampleWatchStatus.style.color = 'var(--text-muted)';
+      } else {
+        exampleWatchStatus.textContent = `Last checked ${time} · ${error || 'error'}`;
+        exampleWatchStatus.style.color = 'var(--error)';
+      }
+    }
+
+    async function refreshExampleComparePoll() {
+      if (!exampleWatchFiles.checked || !exampleHasRenderedOnce) return;
+      try {
+        const res = await fetch('/api/example-compare', { cache: 'no-store' });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Request failed');
+        const sig = data.sortedAcctJson + '\0' + data.sortedCgJson;
+        const changed = sig !== exampleLastSig;
+        if (changed) {
+          exampleLastSig = sig;
+          renderExampleCompare(data);
+        }
+        updateExampleWatchStatus({ ok: true, changed });
+      } catch (err) {
+        updateExampleWatchStatus({ ok: false, error: err.message });
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stopExamplePoll();
+      } else if (exampleWatchFiles.checked && exampleHasRenderedOnce) {
+        refreshExampleComparePoll();
+        startExamplePoll();
+      }
+    });
+
+    exampleWatchFiles.addEventListener('change', () => {
+      if (exampleWatchFiles.checked && exampleHasRenderedOnce) {
+        exampleLastSig = '';
+        refreshExampleComparePoll();
+        startExamplePoll();
+      } else {
+        stopExamplePoll();
+        exampleWatchStatus.textContent = '';
+        exampleWatchStatus.style.color = '';
+      }
+    });
+
+    loadExampleCompareBtn.addEventListener('click', async () => {
+      loadExampleCompareBtn.disabled = true;
+      stopExamplePoll();
+      exampleCompareOut.innerHTML = '<p class="loading">Loading example…</p>';
+      try {
+        const res = await fetch('/api/example-compare', { cache: 'no-store' });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Request failed');
+        exampleLastSig = data.sortedAcctJson + '\0' + data.sortedCgJson;
+        renderExampleCompare(data);
+        exampleHasRenderedOnce = true;
+        updateExampleWatchStatus({ ok: true, changed: true });
+        startExamplePoll();
+      } catch (err) {
+        exampleCompareOut.innerHTML = `<div class="error-box">${escapeHtml(err.message)}</div>`;
+        exampleHasRenderedOnce = false;
+        exampleLastSig = '';
+        exampleWatchStatus.textContent = '';
+      } finally {
+        loadExampleCompareBtn.disabled = false;
+      }
+    });
+
+    function renderExampleCompare(data) {
+      exampleJsonStore = { acct: data.sortedAcctJson, cg: data.sortedCgJson };
+      const d = data.diff;
+      const onlyA = d.onlyInA || [];
+      const onlyB = d.onlyInB || [];
+      const valueDiffs = d.valueDiffs || [];
+      const totalIssues = onlyA.length + onlyB.length + valueDiffs.length;
+
+      let html = '<div class="example-compare-block">';
+      html += `<div class="summary-bar ${totalIssues === 0 ? 'ok' : ''}">`;
+      html += '<span class="summary-text">';
+      if (totalIssues === 0) {
+        html += 'No structural differences after normalization — sample responses match.';
+      } else {
+        html += `<strong>${onlyA.length}</strong> path(s) only in Accounts sample, <strong>${onlyB.length}</strong> only in CG sample, <strong>${valueDiffs.length}</strong> value difference(s).`;
+      }
+      html += '</span></div>';
+
+      if (onlyA.length || onlyB.length) {
+        const panelId = 'ex';
+        html += '<div class="panels-toolbar">';
+        html += `<button type="button" class="sync-btn" id="${panelId}-sync" onclick="toggleSync('${panelId}')" title="Link both filter inputs">⇄ Link filters</button>`;
+        html += '</div>';
+        html += '<div class="diff-panels">';
+        html += buildPanel(panelId, 'a', 'Accounts sample only', 'panel-a', onlyA);
+        html += buildPanel(panelId, 'b', 'CG sample only', 'panel-b', onlyB);
+        html += '</div>';
+      }
+
+      if (valueDiffs.length) {
+        html += '<div class="value-diffs-section">';
+        html += '<div class="value-diffs-label">Value differences</div>';
+        valueDiffs.forEach((vd) => {
+          html += '<div class="value-diff-item">';
+          html += `<div class="value-diff-path">${escapeHtml(vd.path)}</div>`;
+          html += '<div class="value-diff-row">';
+          html += `<span class="value-diff-a">${escapeHtml(JSON.stringify(vd.a))}</span>`;
+          html += '<span class="value-diff-sep">→</span>';
+          html += `<span class="value-diff-b">${escapeHtml(JSON.stringify(vd.b))}</span>`;
+          html += '</div></div>';
+        });
+        html += '</div>';
+      }
+
+      html += '<div class="value-diffs-label" style="margin-top:0.85rem">Sorted JSON (alphabetical keys)</div>';
+      html += '<div class="example-json-grid">';
+      html += '<div class="example-json-panel">';
+      html += '<div class="example-json-head">';
+      html += '<span class="diff-panel-title panel-a">ACCT.json</span>';
+      html += '<button type="button" class="copy-btn" id="ex-copy-acct" onclick="copyExampleSide(\'acct\')">Copy</button>';
+      html += '</div>';
+      html += `<pre class="example-json-pre">${escapeHtml(data.sortedAcctJson)}</pre>`;
+      html += '</div>';
+      html += '<div class="example-json-panel">';
+      html += '<div class="example-json-head">';
+      html += '<span class="diff-panel-title panel-b">CG.json</span>';
+      html += '<button type="button" class="copy-btn" id="ex-copy-cg" onclick="copyExampleSide(\'cg\')">Copy</button>';
+      html += '</div>';
+      html += `<pre class="example-json-pre">${escapeHtml(data.sortedCgJson)}</pre>`;
+      html += '</div>';
+      html += '</div>';
+      html += '</div>';
+
+      exampleCompareOut.innerHTML = html;
+
+      exampleCompareOut.querySelectorAll('.diff-panel-search input').forEach((input) => {
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            input.value = '';
+            input.dispatchEvent(new Event('input'));
+            input.blur();
+          }
+        });
+      });
+    }
+
+    function copyExampleSide(side) {
+      const text = side === 'acct' ? exampleJsonStore.acct : exampleJsonStore.cg;
+      const btnId = side === 'acct' ? 'ex-copy-acct' : 'ex-copy-cg';
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        const orig = btn.innerHTML;
+        btn.textContent = '✓ Copied';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.innerHTML = orig;
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const xAppKey = document.getElementById('xAppKey').value.trim();
       if (!xAppKey) return;
+      const accountIdRaw = document.getElementById('accountId').value.trim();
+      const payload = { xAppKey };
+      if (accountIdRaw) payload.accountId = accountIdRaw;
       submitBtn.disabled = true;
       out.innerHTML = '<div class="card loading">Running compare…</div>';
       try {
@@ -368,7 +705,7 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ xAppKey }),
+          body: JSON.stringify(payload),
         });
         const data = await res.json();
         render(data);
@@ -391,6 +728,8 @@
 
       const total = data.totalAccounts ?? data.accountIds?.length ?? 0;
       const withDiff = data.withDifferences ?? [];
+      const matching = data.matching ?? [];
+      const rawResponseStore = [];
 
       let html = '<div class="card">';
       html += `<div class="summary-bar ${withDiff.length === 0 ? 'ok' : ''}">`;
@@ -400,12 +739,30 @@
         html += 'No differences found — all accounts match.';
       } else {
         html += `<strong>${withDiff.length} account(s) with differences</strong>`;
+        if (matching.length > 0) {
+          html += `, <span style="color:var(--success)">${matching.length} identical</span>`;
+        }
       }
       html += '</span>';
       if (withDiff.length > 1) {
         html += `<button class="icon-btn" onclick="toggleAllAccounts(this)">Expand all</button>`;
       }
       html += '</div>';
+
+      // Matching accounts block (collapsed by default)
+      if (matching.length > 0 && withDiff.length > 0) {
+        html += '<div class="matching-block">';
+        html += `<div class="matching-head" onclick="this.nextElementSibling.classList.toggle('open');this.querySelector('.account-chevron').classList.toggle('open',this.nextElementSibling.classList.contains('open'))">`;
+        html += `<span>✓ ${matching.length} account(s) — responses identical</span>`;
+        html += `<span class="account-chevron" style="transform:rotate(-90deg);transition:transform .15s">▼</span>`;
+        html += '</div>';
+        html += '<div class="matching-body">';
+        html += '<div class="matching-list">';
+        matching.forEach((id) => {
+          html += `<span class="matching-id">${escapeHtml(String(id))}</span>`;
+        });
+        html += '</div></div></div>';
+      }
 
       withDiff.forEach((item, i) => {
         const isFirst = i === 0;
@@ -431,6 +788,18 @@
 
         // Account body
         html += `<div class="account-body${openClass}">`;
+
+        if (item.rawAccounts != null && item.rawCapabilities != null) {
+          rawResponseStore.push({
+            accounts: item.rawAccounts,
+            capabilities: item.rawCapabilities,
+          });
+          const clipIdx = rawResponseStore.length - 1;
+          html += '<div class="raw-copy-toolbar">';
+          html += `<button type="button" class="copy-btn" data-raw-idx="${clipIdx}" data-raw-side="accounts" title="Copy raw HTTP response body from Accounts entitlements">Copy Accounts API response</button>`;
+          html += `<button type="button" class="copy-btn" data-raw-idx="${clipIdx}" data-raw-side="capabilities" title="Copy raw HTTP response body from Capabilities-graph entitlements">Copy Capabilities API response</button>`;
+          html += '</div>';
+        }
 
         if (item.error) {
           if (item.accountsError) {
@@ -476,6 +845,26 @@
 
       html += '</div>';
       out.innerHTML = html;
+
+      out.querySelectorAll('.raw-copy-toolbar button[data-raw-idx]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = Number(btn.dataset.rawIdx);
+          const side = btn.dataset.rawSide;
+          const row = rawResponseStore[idx];
+          if (!row) return;
+          const text = side === 'accounts' ? row.accounts : row.capabilities;
+          navigator.clipboard.writeText(text).then(() => {
+            const orig = btn.innerHTML;
+            btn.textContent = '✓ Copied';
+            btn.classList.add('copied');
+            setTimeout(() => {
+              btn.innerHTML = orig;
+              btn.classList.remove('copied');
+            }, 2000);
+          });
+        });
+      });
 
       // Attach Escape-to-clear on every filter input
       out.querySelectorAll('.diff-panel-search input').forEach((input) => {

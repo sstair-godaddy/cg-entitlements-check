@@ -1,9 +1,15 @@
 const ACCOUNTS_URL = 'https://websites.accounts.api.test-godaddy.com/v1/accounts';
 const ACCOUNTS_ENTITLEMENTS_BASE = 'https://websites.accounts.api.test-godaddy.com/v1/accounts';
-const CAPABILITIES_ENTITLEMENTS_BASE = 'https://capabilities-graph.api.test-godaddy.com/api/v1/capabilities-entitlements';
+// Replace with local base URL when running locally: https://local.capabilities-graph.api.test-godaddy.com:8428/api/v1/capabilities-entitlements
+const CAPABILITIES_ENTITLEMENTS_BASE = 'https://local.capabilities-graph.api.test-godaddy.com:8428/api/v1/capabilities-entitlements';
 
-function extractAccountIds(body) {
-  const data = typeof body === 'string' ? JSON.parse(body) : body;
+function extractAccountIds(fetchResult) {
+  const data =
+    fetchResult && typeof fetchResult === 'object' && 'data' in fetchResult && !fetchResult.__error
+      ? fetchResult.data
+      : typeof fetchResult === 'string'
+        ? JSON.parse(fetchResult)
+        : fetchResult;
   const list = Array.isArray(data) ? data : data?.accounts ?? data?.data ?? [];
   if (!Array.isArray(list)) return [];
   return list.map((item) => item?.accountId ?? item?.id).filter(Boolean);
@@ -82,62 +88,100 @@ function diff(a, b) {
   return runDiff(normA, normB);
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Run `fn` over `items` with at most `concurrency` in-flight at once,
+ * pausing `delayMs` between each batch to avoid overwhelming the API.
+ */
+async function runWithConcurrency(items, fn, { concurrency = 3, delayMs = 1000 } = {}) {
+  const results = [];
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const batchResults = await Promise.all(batch.map(fn));
+    results.push(...batchResults);
+    if (i + concurrency < items.length && delayMs > 0) {
+      await sleep(delayMs);
+    }
+  }
+  return results;
+}
+
 async function fetchJson(url, headers) {
   const res = await fetch(url, { headers });
-  const text = await res.text();
+  const raw = await res.text();
   if (!res.ok) {
-    return { __error: true, status: res.status, statusText: res.statusText, body: text };
+    return { __error: true, status: res.status, statusText: res.statusText, body: raw };
   }
   try {
-    return JSON.parse(text);
+    const data = JSON.parse(raw);
+    return { data, raw };
   } catch {
-    return { __error: true, parseError: true, body: text };
+    return { __error: true, parseError: true, body: raw };
   }
 }
 
 /**
  * Run the entitlements comparison.
- * @param {{ xAppKey: string, cookies?: string }} options
+ * @param {{ xAppKey: string, cookies?: string, accountId?: string }} options
+ * When `accountId` is a non-empty string, only that account is compared (skips listing all accounts).
  * @returns {Promise<{ success: boolean, error?: string, accountIds?: string[], withDifferences?: object[] }}}
  */
-export async function runCompare({ xAppKey, cookies = '' }) {
+export async function runCompare({ xAppKey, cookies = '', accountId: singleAccountId } = {}) {
   const headers = {
     'x-app-key': xAppKey,
     Accept: 'application/json',
   };
   if (cookies) headers.Cookie = cookies;
 
-  const accountsBody = await fetchJson(ACCOUNTS_URL, headers);
-  if (accountsBody.__error) {
-    const { status, statusText, body } = accountsBody;
-    return {
-      success: false,
-      error: `Accounts request failed: ${status} ${statusText}`,
-      errorDetail: body,
-      status,
-    };
+  const trimmedId = typeof singleAccountId === 'string' ? singleAccountId.trim() : '';
+  let accountIds;
+
+  if (trimmedId) {
+    accountIds = [trimmedId];
+  } else {
+    const accountsBody = await fetchJson(ACCOUNTS_URL, headers);
+    if (accountsBody.__error) {
+      const { status, statusText, body } = accountsBody;
+      return {
+        success: false,
+        error: `Accounts request failed: ${status} ${statusText}`,
+        errorDetail: body,
+        status,
+      };
+    }
+
+    accountIds = extractAccountIds(accountsBody);
+    if (accountIds.length === 0) {
+      return { success: true, accountIds: [], withDifferences: [] };
+    }
   }
 
-  const accountIds = extractAccountIds(accountsBody);
-  if (accountIds.length === 0) {
-    return { success: true, accountIds: [], withDifferences: [] };
-  }
-
-  const results = await Promise.all(
-    accountIds.map(async (accountId) => {
+  const results = await runWithConcurrency(
+    accountIds,
+    async (accountId) => {
       const [accountsEntitlements, capabilitiesEntitlements] = await Promise.all([
         fetchJson(
-          `${ACCOUNTS_ENTITLEMENTS_BASE}/${accountId}/entitlements?transitionable=true&used=true`,
+          `${ACCOUNTS_ENTITLEMENTS_BASE}/${accountId}/entitlements?transitionable=true&used=false&cache=false`,
           headers
         ),
         fetchJson(
-          `${CAPABILITIES_ENTITLEMENTS_BASE}/${accountId}?used=true&transitionable=true`,
+          `${CAPABILITIES_ENTITLEMENTS_BASE}/${accountId}?used=false&transitionable=true`,
           headers
         ),
       ]);
 
       const hasErrorA = accountsEntitlements?.__error;
       const hasErrorB = capabilitiesEntitlements?.__error;
+      const rawAccounts = hasErrorA
+        ? String(accountsEntitlements.body ?? '')
+        : String(accountsEntitlements.raw ?? '');
+      const rawCapabilities = hasErrorB
+        ? String(capabilitiesEntitlements.body ?? '')
+        : String(capabilitiesEntitlements.raw ?? '');
+
       if (hasErrorA || hasErrorB) {
         return {
           accountId,
@@ -145,24 +189,39 @@ export async function runCompare({ xAppKey, cookies = '' }) {
           error: true,
           accountsError: hasErrorA ? accountsEntitlements : null,
           capabilitiesError: hasErrorB ? capabilitiesEntitlements : null,
+          rawAccounts,
+          rawCapabilities,
         };
       }
 
-      const diffResult = diff(accountsEntitlements, capabilitiesEntitlements);
+      const diffResult = diff(accountsEntitlements.data, capabilitiesEntitlements.data);
       const hasDiff =
         diffResult.onlyInA.length > 0 ||
         diffResult.onlyInB.length > 0 ||
         diffResult.valueDiffs.length > 0;
 
-      return { accountId, diff: hasDiff ? diffResult : null, error: false };
-    })
+      return {
+        accountId,
+        diff: hasDiff ? diffResult : null,
+        error: false,
+        rawAccounts,
+        rawCapabilities,
+      };
+    }
   );
 
   const withDifferences = results.filter((r) => r.diff || r.error);
+  const matching = results
+    .filter((r) => !r.diff && !r.error)
+    .map((r) => r.accountId);
   return {
     success: true,
     accountIds,
     withDifferences,
+    matching,
     totalAccounts: accountIds.length,
   };
 }
+
+/** Deep-sort object keys (and array elements) for stable alphabetical JSON. */
+export { diff, normalizeForCompare as sortKeysAlphabetically };
